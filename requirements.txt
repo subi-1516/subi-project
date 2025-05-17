@@ -1,0 +1,12 @@
+pandas: For data manipulation and analysis.
+
+numpy: To handle numerical operations efficiently.
+
+Seaborn: For beautiful data visualizations that can help highlight trends in our findings.
+
+Matplotlib: Another visualization library to create various plots and charts.
+
+Scikit-learn: Essential for machine learning tasks, including model training and evaluation.
+
+TensorFlow: If we decide to implement deep learning models for more complex analysis.
+
