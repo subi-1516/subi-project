@@ -1,3 +1,4 @@
+#import libraries
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -11,6 +12,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import re
 import string
 
+# load dataset
 df = pd.read_csv(r'C:\Users\ADMIN\Downloads\fake_news_dataset (1).csv')
 print(df.head())
 print(df.info())
