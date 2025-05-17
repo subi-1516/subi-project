@@ -2,80 +2,97 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-import nltk
-from nltk.corpus import stopwords
+
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import PassiveAggressiveClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix
-import tkinter as tk
-from tkinter import messagebox
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_curve, auc
+import re
+import string
 
-# NLTK setup
-nltk.download('stopwords')
-stop_words = stopwords.words('english')
+df = pd.read_csv(r'C:\Users\ADMIN\Downloads\fake_news_dataset (1).csv')
+print(df.head())
+print(df.info())
 
-# Load your dataset
-df = pd.read_csv("fake_news_dataset.csv")
+# Check for nulls
+df = df.dropna()
 
-# Quick inspection
-print("Dataset shape:", df.shape)
-print("Columns:", df.columns)
+# Combine title and text if available
+if 'title' in df.columns and 'text' in df.columns:
+    df['content'] = df['title'] + " " + df['text']
+else:
+    df['content'] = df[df.columns[0]]  # fallback
 
-# Rename target column if needed
-if 'label' not in df.columns:
-    df.rename(columns={df.columns[-1]: 'label'}, inplace=True)
-
-# Preprocessing text data
+# Clean text
 def clean_text(text):
-    words = str(text).lower().split()
-    words = [word for word in words if word.isalpha() and word not in stop_words]
-    return ' '.join(words)
+    text = text.lower()
+    text = re.sub(r'\[.*?\]', '', text)
+    text = re.sub(r'https?://\S+|www\.\S+', '', text)
+    text = re.sub(r'<.*?>+', '', text)
+    text = re.sub(r'[%s]' % re.escape(string.punctuation), '', text)
+    text = re.sub(r'\n', ' ', text)
+    text = re.sub(r'\w*\d\w*', '', text)
+    return text
 
-df['clean_text'] = df['text'].apply(clean_text)
+df['content'] = df['content'].apply(clean_text)
 
-# TF-IDF Vectorization
-vectorizer = TfidfVectorizer(max_df=0.7)
-X = vectorizer.fit_transform(df['clean_text'])
-y = df['label'].map({'FAKE': 0, 'REAL': 1}) if df['label'].dtype == object else df['label']
+vectorizer = TfidfVectorizer(stop_words='english', max_df=0.7)
+X = vectorizer.fit_transform(df['content'])
 
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+y = df['label']  # Assumes 'label' is 0 (real) and 1 (fake)
 
-# Train classifier
-model = PassiveAggressiveClassifier(max_iter=1000)
-model.fit(X_train, y_train)
-y_pred = model.predict(X_test)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
 
-# Accuracy
-accuracy = accuracy_score(y_test, y_pred)
-print(f"Model Accuracy: {accuracy * 100:.2f}%")
+# Logistic Regression
+lr_model = LogisticRegression()
+lr_model.fit(X_train, y_train)
 
-# Confusion Matrix
-cm = confusion_matrix(y_test, y_pred)
-sns.heatmap(cm, annot=True, fmt='d', cmap='coolwarm', xticklabels=['Fake', 'Real'], yticklabels=['Fake', 'Real'])
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-plt.title("Confusion Matrix")
+# Random Forest
+rf_model = RandomForestClassifier()
+rf_model.fit(X_train, y_train)
+
+def evaluate(model, name):
+    y_pred = model.predict(X_test)
+    print(f"\n{name} Results:")
+    print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
+    print(f"Precision: {precision_score(y_test, y_pred):.4f}")
+    print(f"Recall: {recall_score(y_test, y_pred):.4f}")
+    print(f"F1 Score: {f1_score(y_test, y_pred):.4f}")
+    cm = confusion_matrix(y_test, y_pred)
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title(f'{name} Confusion Matrix')
+    plt.show()
+
+evaluate(lr_model, "Logistic Regression")
+evaluate(rf_model, "Random Forest")
+
+def plot_roc(model, name):
+    y_prob = model.predict_proba(X_test)[:,1]
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    plt.plot(fpr, tpr, label=f'{name} AUC: {auc(fpr, tpr):.4f}')
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve')
+    plt.legend()
+
+plot_roc(lr_model, "Logistic Regression")
+plot_roc(rf_model, "Random Forest")
 plt.show()
 
-# GUI for interactive predictions
-def predict_news():
-    input_text = input_box.get("1.0", tk.END)
-    clean_input = clean_text(input_text)
-    input_vector = vectorizer.transform([clean_input])
-    prediction = model.predict(input_vector)[0]
-    result = "REAL" if prediction == 1 else "FAKE"
-    messagebox.showinfo("Prediction Result", f"The news is: {result}")
+# Save this as app.py
+# streamlit run app.py
+import streamlit as st
 
-# Tkinter GUI
-app = tk.Tk()
-app.title("Fake News Detection")
-app.geometry("500x300")
+def predict_news(text):
+    cleaned = clean_text(text)
+    vec = vectorizer.transform([cleaned])
+    pred = rf_model.predict(vec)[0]
+    return "Fake" if pred == 1 else "Real"
 
-tk.Label(app, text="Enter News Text:", font=("Arial", 14)).pack(pady=10)
-input_box = tk.Text(app, height=8, width=60)
-input_box.pack(pady=5)
-
-tk.Button(app, text="Check News", font=("Arial", 12), bg="blue", fg="white", command=predict_news).pack(pady=10)
-app.mainloop()
+st.title("Fake News Detector")
+user_input = st.text_area("Enter News Text:")
+if st.button("Predict"):
+    result = predict_news(user_input)
+    st.subheader(f"The news is: {result}")
