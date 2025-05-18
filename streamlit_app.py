@@ -3,7 +3,6 @@
 import streamlit as st
 
 def predict_news(text):
-    cleaned = clean_text(text)
     vec = vectorizer.transform([cleaned])
     pred = rf_model.predict(vec)[0]
     return "Fake" if pred == 1 else "Real"
