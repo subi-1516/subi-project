@@ -9,4 +9,4 @@ def predict_news(text):
 st.title("Fake News Detector")
 user_input = st.text_area("Enter News Text:")
 if st.button("Predict"):
-    st.subheader(f"The news is: {result}")
+    st.subheader(f"The news is: ")
